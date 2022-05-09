@@ -14,8 +14,31 @@ class LocationViewController: UIViewController {
     var locationList: [LocationSearchResponse] = []
     var consolidatedWeatherList: [ConsolidatedWeather] = []
     
+    private lazy var todayLabel: UILabel = {
+        let label = UILabel()
+        label.textAlignment = .center
+        label.text = "Today"
+        return label
+    }()
+    
+    private lazy var tomorrowLabel: UILabel = {
+        let label = UILabel()
+        label.textAlignment = .center
+        label.text = "Tomorrow"
+        return label
+    }()
+    
+    private lazy var stackView: UIStackView = {
+        let view = UIStackView(arrangedSubviews: [todayLabel, tomorrowLabel])
+        view.backgroundColor = .systemYellow
+        view.distribution = .fillEqually
+        view.axis = .horizontal
+        return view
+    }()
+    
     private lazy var tableView: UITableView = {
         let view = UITableView(frame: .zero, style: .plain)
+        view.allowsSelection = false
         view.delegate = self
         view.dataSource = self
         view.register(WeatherCollectionViewCell.self, forCellReuseIdentifier: WeatherCollectionViewCell.identifier)
@@ -26,9 +49,10 @@ class LocationViewController: UIViewController {
         super.viewDidLoad()
         
         Task {
+            layout()
             await fetch()
             await fetch2()
-            layout()
+            tableView.reloadData()
         }
     }
 
@@ -45,27 +69,35 @@ class LocationViewController: UIViewController {
     }
     
     private func fetch2() async {
-        let number = String(locationList[0].woeid)
-        let data = await networkManager.fetchLocation(woeid: number)
-        
-        switch data {
-        case .success(let result):
-            consolidatedWeatherList = result.consolidatedWeather
-            print(result.consolidatedWeather)
-        case .failure(let error):
-            print(error.localizedDescription)
+        for i in 0...locationList.count - 1 {
+            let woeid = String(locationList[i].woeid)
+            let data = await networkManager.fetchLocation(woeid: woeid)
+            switch data {
+            case .success(let result):
+                consolidatedWeatherList = result.consolidatedWeather
+                print("🥵\(consolidatedWeatherList)")
+                tableView.reloadData()
+            case .failure(let error):
+                print(error.localizedDescription)
+            }
         }
     }
 }
 
 extension LocationViewController {
-    func layout() {
+    private func layout() {
         title = "Local Weather"
         navigationController?.navigationBar.prefersLargeTitles = true
         
+        view.addSubview(stackView)
+        stackView.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide).inset(16)
+            $0.leading.trailing.equalToSuperview()
+        }
+        
         view.addSubview(tableView)
         tableView.snp.makeConstraints {
-            $0.top.equalTo(view.safeAreaLayoutGuide)
+            $0.top.equalTo(stackView.snp.bottom)
             $0.leading.trailing.bottom.equalToSuperview()
         }
     }
@@ -78,40 +110,13 @@ extension LocationViewController: UITableViewDataSource, UITableViewDelegate {
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: WeatherCollectionViewCell.identifier, for: indexPath) as? WeatherCollectionViewCell else { return UITableViewCell() }
-//        cell.setTitle(locationList[indexPath.row].title)
-        cell.setToday(title: locationList[indexPath.row].title, weatherList: consolidatedWeatherList[indexPath.row])
-//        cell.setContent(weatherList: consolidatedWeatherList)
+        cell.setTitle(locationList[indexPath.row].title)
+        cell.setToday(weatherList: consolidatedWeatherList[0])
+        cell.setTomorrow(weatherList: consolidatedWeatherList[1])
         return cell
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 300
+        return 160
     }
-    
-//    func numberOfSections(in tableView: UITableView) -> Int {
-//        locationList.count
-//    }
-    
-//    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-//
-//        let abc = NSMutableAttributedString(s)
-//        let header = UILabel()
-//        header.font = .systemFont(ofSize: 20, weight: .bold)
-//        header.text = locationList[section].title
-//        return head
-//    }
-    
-//    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-//        let headerLabel = UILabel()
-//        headerLabel.frame = CGRect(x: 20, y: 4, width: 320, height: 20)
-//        headerLabel.font = .systemFont(ofSize: 20, weight: .bold)
-//        headerLabel.text = locationList[section].title
-//        headerLabel.textColor = .label
-//
-//        let headerView = UIView()
-//        headerView.backgroundColor = .systemBackground
-//        headerView.addSubview(headerLabel)
-//
-//        return headerView
-//    }
 }
